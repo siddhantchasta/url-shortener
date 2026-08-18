@@ -16,6 +16,11 @@ class URLCreateRequest(BaseModel):
         return v
 
 
+class URLUpdateRequest(BaseModel):
+    url: HttpUrl | None = None
+    expires_in_hours: int | None = Field(default=None, ge=1, le=8760)
+
+
 class URLResponse(BaseModel):
     short_code: str
     short_url: str
