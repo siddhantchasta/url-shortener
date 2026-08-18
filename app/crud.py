@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import URL
@@ -23,3 +23,10 @@ async def create_url(
 async def get_url_by_code(db: AsyncSession, short_code: str) -> URL | None:
     result = await db.execute(select(URL).where(URL.short_code == short_code))
     return result.scalar_one_or_none()
+
+
+async def increment_click_count(db: AsyncSession, short_code: str) -> None:
+    await db.execute(
+        update(URL).where(URL.short_code == short_code).values(click_count=URL.click_count + 1)
+    )
+    await db.commit()
