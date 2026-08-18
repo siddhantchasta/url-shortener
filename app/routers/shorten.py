@@ -4,13 +4,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import crud, utils
 from app.config import settings
 from app.database import get_db
+from app.rate_limiter import rate_limiter
 from app.redis_client import get_redis
 from app.schemas import URLCreateRequest, URLResponse
 
 router = APIRouter(prefix="/api/v1/urls", tags=["urls"])
 
 
-@router.post("", response_model=URLResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=URLResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limiter)],
+)
 async def shorten_url(
     payload: URLCreateRequest,
     db: AsyncSession = Depends(get_db),
