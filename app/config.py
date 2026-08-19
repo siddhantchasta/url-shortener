@@ -30,11 +30,15 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def assemble_db_url(cls, v: str) -> str:
-        if isinstance(v, str):
+        if isinstance(v, str) and v:
             if v.startswith("postgres://"):
-                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+                v = v.replace("postgres://", "postgresql+asyncpg://", 1)
             elif v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
-                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+            # asyncpg expects 'ssl=' instead of libpq's 'sslmode='
+            if "sslmode=" in v:
+                v = v.replace("sslmode=", "ssl=")
         return v
 
 
