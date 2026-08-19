@@ -10,6 +10,8 @@ from app.schemas import URLCreateRequest, URLResponse
 
 router = APIRouter(prefix="/api/v1/urls", tags=["urls"])
 
+MAX_CODE_GENERATION_ATTEMPTS = 5
+
 
 @router.post(
     "",
@@ -22,11 +24,24 @@ async def shorten_url(
     db: AsyncSession = Depends(get_db),
     redis_client=Depends(get_redis),
 ):
-    short_code = payload.custom_alias or utils.generate_short_code(settings.short_code_length)
-
-    existing = await crud.get_url_by_code(db, short_code)
-    if existing is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Short code already in use")
+    if payload.custom_alias:
+        short_code = payload.custom_alias
+        existing = await crud.get_url_by_code(db, short_code)
+        if existing is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Short code already in use")
+    else:
+        short_code = None
+        for _ in range(MAX_CODE_GENERATION_ATTEMPTS):
+            candidate = utils.generate_short_code(settings.short_code_length)
+            existing = await crud.get_url_by_code(db, candidate)
+            if existing is None:
+                short_code = candidate
+                break
+        if short_code is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not generate a unique short code, try again",
+            )
 
     expires_in_hours = payload.expires_in_hours or settings.default_expiry_hours
 
