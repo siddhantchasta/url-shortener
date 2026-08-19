@@ -9,5 +9,7 @@ def generate_short_code(length: int = 6) -> str:
 
 
 def build_short_url(domain: str, short_code: str) -> str:
-    scheme = "http" if domain.startswith("localhost") else "https"
-    return f"{scheme}://{domain}/{short_code}"
+    cleaned_domain = domain.removeprefix("https://").removeprefix("http://").rstrip("/")
+    scheme = "http" if cleaned_domain.startswith("localhost") else "https"
+    return f"{scheme}://{cleaned_domain}/{short_code}"
+
