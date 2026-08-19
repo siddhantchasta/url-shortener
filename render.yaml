@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: url-shortener
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DEBUG_MODE
+        value: "false"
+      - key: DOMAIN
+        sync: false
+      - key: API_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
