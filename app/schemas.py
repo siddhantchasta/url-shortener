@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
+from app.security import UnsafeRedirectTargetError, assert_safe_redirect_target
+
 
 class URLCreateRequest(BaseModel):
     url: HttpUrl
@@ -15,10 +17,30 @@ class URLCreateRequest(BaseModel):
             raise ValueError("custom_alias must be alphanumeric")
         return v
 
+    @field_validator("url")
+    @classmethod
+    def url_must_be_safe_target(cls, v: HttpUrl) -> HttpUrl:
+        try:
+            assert_safe_redirect_target(str(v))
+        except UnsafeRedirectTargetError as exc:
+            raise ValueError(str(exc)) from exc
+        return v
+
 
 class URLUpdateRequest(BaseModel):
     url: HttpUrl | None = None
     expires_in_hours: int | None = Field(default=None, ge=1, le=8760)
+
+    @field_validator("url")
+    @classmethod
+    def url_must_be_safe_target(cls, v: HttpUrl | None) -> HttpUrl | None:
+        if v is None:
+            return v
+        try:
+            assert_safe_redirect_target(str(v))
+        except UnsafeRedirectTargetError as exc:
+            raise ValueError(str(exc)) from exc
+        return v
 
 
 class URLResponse(BaseModel):
