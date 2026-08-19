@@ -5,25 +5,34 @@ from app.config import settings
 from app.redis_client import get_redis
 
 
+def get_client_ip(request: Request) -> str:
+    """Extract real client IP, respecting proxy headers from Render/Nginx/Cloudflare."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
 async def rate_limiter(request: Request, redis_client: redis.Redis = Depends(get_redis)) -> None:
-    """Fixed-window limiter keyed by client IP. Known trade-off: allows a burst
-    right at the window boundary — a sliding-window/token-bucket limiter avoids
-    that, worth naming if asked how you'd improve this."""
-    client_ip = request.client.host if request.client else "unknown"
+    """Fixed-window limiter keyed by client IP using atomic Redis INCR."""
+    client_ip = get_client_ip(request)
     key = f"rate_limit:{client_ip}"
 
-    current = await redis_client.get(key)
+    count = await redis_client.incr(key)
+    if count == 1:
+        await redis_client.expire(key, settings.rate_limit_window_seconds)
 
-    if current is None:
-        await redis_client.set(key, settings.api_quota - 1, ex=settings.rate_limit_window_seconds)
-        return
-
-    remaining = int(current)
-    if remaining <= 0:
+    if count > settings.api_quota:
         ttl = await redis_client.ttl(key)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={"error": "Rate limit exceeded", "retry_after_seconds": ttl},
+            detail={"error": "Rate limit exceeded", "retry_after_seconds": max(ttl, 1)},
         )
 
-    await redis_client.decr(key)
