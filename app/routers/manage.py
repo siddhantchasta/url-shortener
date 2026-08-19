@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud, utils
+from app.auth import require_api_key
 from app.config import settings
 from app.database import get_db
 from app.redis_client import get_redis
@@ -31,7 +32,7 @@ async def get_url_info(short_code: str, db: AsyncSession = Depends(get_db)):
     return _to_response(url)
 
 
-@router.put("/{short_code}", response_model=URLResponse)
+@router.put("/{short_code}", response_model=URLResponse, dependencies=[Depends(require_api_key)])
 async def edit_url(
     short_code: str,
     payload: URLUpdateRequest,
@@ -56,7 +57,7 @@ async def edit_url(
     return _to_response(url)
 
 
-@router.delete("/{short_code}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{short_code}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_api_key)])
 async def remove_url(
     short_code: str,
     db: AsyncSession = Depends(get_db),

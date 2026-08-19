@@ -2,12 +2,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import require_api_key
 from app.config import settings
 from app.database import get_db
 from app.models import URL
 from app.redis_client import get_redis
 
-router = APIRouter(prefix="/debug", tags=["debug"])
+router = APIRouter(prefix="/debug", tags=["debug"], dependencies=[Depends(require_api_key)])
 
 
 def _guard_debug_mode() -> None:
