@@ -4,26 +4,32 @@ A URL shortener built with FastAPI, PostgreSQL, and Redis — custom aliases,
 configurable link expiration, Redis-backed rate limiting, API-key-gated write
 endpoints, and health/debug monitoring.
 
+**Live:** [Render](https://url-shortener-zaqb.onrender.com)
+
 ## Architecture
 
 Postgres is the source of truth; Redis is a cache-aside layer in front of it
 for low-latency redirects. Writes go to Postgres and immediately populate
 Redis. Reads check Redis first and only fall back to Postgres on a cache
-miss, repopulating the cache afterward. In production this points at a
-managed Redis Cloud instance rather than a local container.
+miss, repopulating the cache afterward.
 
-The service is stateless — all state lives in Postgres/Redis — so it runs as
-three replicas behind an nginx load balancer (see `docker-compose.yml`).
+In production this runs on Render, with managed PostgreSQL (Neon) and managed
+Redis (Upstash) in place of the local Docker containers used for development.
 
-## Quick Start
+The service is stateless — no session state lives in the app process, only in
+Postgres/Redis — so it scales horizontally by adding instances with no
+application-level changes. `docker-compose.yml` demonstrates this locally
+with three replicas behind an nginx load balancer.
 
-```bash
+## Quick Start (local)
+
+\`\`\`bash
 cp .env.example .env
 # set API_KEY to a real value before running
 docker-compose up --build
 # API: http://localhost:8000
 # Docs: http://localhost:8000/docs
-```
+\`\`\`
 
 ## Authentication
 
@@ -67,7 +73,7 @@ the redirect hot path (cache hit):
 
 ## Tests
 
-```bash
+\`\`\`bash
 pip install -r requirements.txt
 pytest
-```
+\`\`\`
