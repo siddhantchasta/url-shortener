@@ -51,8 +51,15 @@ async def delete_url(db: AsyncSession, short_code: str) -> bool:
     return result.rowcount > 0
 
 
-async def increment_click_count(db: AsyncSession, short_code: str) -> None:
+async def increment_click_count_by_amount(db: AsyncSession, short_code: str, amount: int) -> None:
     await db.execute(
-        update(URL).where(URL.short_code == short_code).values(click_count=URL.click_count + 1)
+        update(URL)
+        .where(URL.short_code == short_code)
+        .values(click_count=URL.click_count + amount)
     )
     await db.commit()
+
+
+async def increment_click_count(db: AsyncSession, short_code: str) -> None:
+    await increment_click_count_by_amount(db, short_code, 1)
+

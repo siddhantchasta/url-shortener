@@ -13,23 +13,29 @@ from app.schemas import URLResponse, URLUpdateRequest
 router = APIRouter(prefix="/api/v1/urls", tags=["urls"])
 
 
-def _to_response(url) -> URLResponse:
+def _to_response(url, extra_clicks: int = 0) -> URLResponse:
     return URLResponse(
         short_code=url.short_code,
         short_url=utils.build_short_url(settings.domain, url.short_code),
         original_url=url.original_url,
         created_at=url.created_at,
         expires_at=url.expires_at,
-        click_count=url.click_count,
+        click_count=url.click_count + extra_clicks,
     )
 
 
 @router.get("/{short_code}", response_model=URLResponse)
-async def get_url_info(short_code: str, db: AsyncSession = Depends(get_db)):
+async def get_url_info(
+    short_code: str,
+    db: AsyncSession = Depends(get_db),
+    redis_client=Depends(get_redis),
+):
     url = await crud.get_url_by_code(db, short_code)
     if url is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Short URL not found")
-    return _to_response(url)
+    pending_clicks = await redis_client.get(f"clicks:{short_code}")
+    extra = int(pending_clicks) if pending_clicks else 0
+    return _to_response(url, extra_clicks=extra)
 
 
 @router.put("/{short_code}", response_model=URLResponse, dependencies=[Depends(require_api_key)])
@@ -54,7 +60,9 @@ async def edit_url(
             ttl = max(int((url.expires_at - datetime.now(timezone.utc)).total_seconds()), 1)
         await redis_client.set(f"url:{short_code}", url.original_url, ex=ttl)
 
-    return _to_response(url)
+    pending_clicks = await redis_client.get(f"clicks:{short_code}")
+    extra = int(pending_clicks) if pending_clicks else 0
+    return _to_response(url, extra_clicks=extra)
 
 
 @router.delete("/{short_code}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_api_key)])
@@ -67,3 +75,5 @@ async def remove_url(
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Short URL not found")
     await redis_client.delete(f"url:{short_code}")
+    await redis_client.delete(f"clicks:{short_code}")
+

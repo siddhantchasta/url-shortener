@@ -21,7 +21,15 @@ async def debug_stats(db: AsyncSession = Depends(get_db), redis_client=Depends(g
     _guard_debug_mode()
 
     total_urls = await db.scalar(select(func.count()).select_from(URL))
-    total_clicks = await db.scalar(select(func.coalesce(func.sum(URL.click_count), 0)))
+    db_clicks = await db.scalar(select(func.coalesce(func.sum(URL.click_count), 0)))
+
+    pending_clicks = 0
+    async for key in redis_client.scan_iter("clicks:*"):
+        val = await redis_client.get(key)
+        if val:
+            pending_clicks += int(val)
+
+    total_clicks = (db_clicks or 0) + pending_clicks
     redis_keys = await redis_client.dbsize()
 
     return {
